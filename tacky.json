@@ -1,0 +1,14 @@
+{
+	"id": "tacky",
+	"name": "Tacky Jokers",
+	"display_name": "Tacky Jokers",
+	"author": ["Tacashumi", "fey-fish"],
+	"description": "Vanilla-esque Jokers that encourage non-meta playstyles",
+	"prefix": "tac",
+	"main_file": "main.lua",
+	"priority": 0,
+	"badge_colour": "777FFF",
+	"badge_text_colour": "FFFFFF",
+	"version": "1.0.0",
+	"dependencies": []
+}

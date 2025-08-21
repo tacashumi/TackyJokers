@@ -1,0 +1,368 @@
+# manifest
+[manifest]
+version = "0.1.0"
+dump_lua = true
+priority = 0
+
+[[patches]]
+[patches.pattern]
+target = 'card.lua'
+pattern = '''
+if self.area and self.area == G.deck and self.area.cards[1] == self then 
+        G.FUNCS.deck_info()
+end
+'''
+position = 'after'
+match_indent = true
+payload = '''
+if G.VIEWING_DECK == true and self.area ~= G.deck then
+  SMODS.calculate_context { deck_click = self }
+end
+'''
+
+[[patches]]
+[patches.pattern]
+target = 'functions/common_events.lua'
+pattern = '''
+new_card:set_ability(other.config.center)
+'''
+position = 'after'
+match_indent = true
+payload = '''
+new_card.playing_card = other.playing_card
+'''
+
+[[patches]]
+[patches.pattern]
+target = 'functions/common_events.lua'
+pattern = '''
+function reset_idol_card()
+'''
+position = 'before'
+match_indent = true
+payload = '''
+
+function luggage_card()
+    if #G.play.cards == 1 and #SMODS.find_card('j_tac_luggage') > 0 then
+        G.GAME.luggage_card = G.play.cards[1].sort_id
+    end
+end
+
+function reset_chaos_theory()
+    G.GAME.current_round.chaos_sort = pseudorandom_element({'Rank', 'Suit'}, pseudoseed('tac_chaos_sort'))
+    G.GAME.current_round.chaos_card = pseudorandom_element(G.playing_cards, pseudoseed('tac_chaos_card'))
+end
+'''
+[[patches]]
+[patches.pattern]
+target = 'functions/state_events.lua'
+pattern = '''
+reset_idol_card()
+'''
+position = 'before'
+match_indent = true
+payload = '''
+reset_chaos_theory()
+'''
+
+[[patches]]
+[patches.pattern]
+target = 'functions/state_events.lua'
+pattern = '''
+-- context.before calculations
+'''
+position = 'after'
+match_indent = true
+payload = '''
+
+luggage_card()
+
+'''
+
+#no kill on 0 hand size with luggage card stuff
+[[patches]]
+[patches.pattern]
+target = 'game.lua'
+pattern = '''
+if #G.hand.cards < 1 and #G.deck.cards < 1 and #G.play.cards < 1 then
+        end_round()
+    end
+'''
+position = 'at'
+match_indent = true
+payload = ''''''
+[[patches]]
+[patches.pattern]
+target = 'game.lua'
+pattern = '''
+if #G.hand.cards < 1 and #G.deck.cards < 1 then
+            end_round()
+        else
+'''
+position = 'at'
+match_indent = true
+payload = '''
+if not (#G.hand.cards < 1 and #G.deck.cards < 1) then
+'''
+[[patches]]
+[patches.pattern]
+target = 'functions/state_events.lua'
+pattern = '''
+if not (G.STATE == G.STATES.TAROT_PACK or G.STATE == G.STATES.SPECTRAL_PACK or G.STATE == G.STATES.SMODS_BOOSTER_OPENED) and
+        G.hand.config.card_limit <= 0 and #G.hand.cards == 0 then 
+        G.STATE = G.STATES.GAME_OVER; G.STATE_COMPLETE = false 
+        return true
+    end
+'''
+position = 'at'
+match_indent = true
+payload = ''''''
+[[patches]]
+[patches.pattern]
+target = 'functions/state_events.lua'
+pattern = '''
+if G.GAME.facing_blind then G.GAME.current_round.any_hand_drawn = true end
+            end
+            return true
+        end
+    }))
+'''
+position = 'after'
+match_indent = false
+payload = '''
+G.E_MANAGER:add_event(Event({
+        trigger = 'before',
+        func = function()
+            if #G.hand.cards < 1 or (#G.hand.cards < 1 and #G.deck.cards < 1) then
+            local lug = SMODS.find_card('j_tac_luggage')
+                if not (G.GAME.luggage_card and lug[1]) or lug[1].ability.extra.drawn == true then
+                    end_round()
+                end
+            end
+            return true
+        end
+    }))
+'''
+[[patches]]
+[patches.pattern]
+target = 'game.lua'
+pattern = '''
+if (not G.hand.cards[1]) and G.deck.cards[1] then
+'''
+position = 'at'
+match_indent = true
+payload = '''
+if (not G.hand.cards[1]) and G.deck.cards[1] and G.hand.config.card_limit > 0 then
+'''
+[[patches]]
+[patches.pattern]
+target = 'game.lua'
+pattern = '''
+function Game:update_draw_to_hand(dt)
+'''
+position = 'after'
+match_indent = true
+payload = '''
+if G.hand.config.card_limit < 1 then
+    SMODS.calculate_context({no_hand_draw = true})
+end
+'''
+
+#herald 2 slots
+[[patches]]
+[patches.pattern]
+target = 'cardarea.lua'
+pattern = '''
+self.config.card_count = #self.cards
+'''
+position = 'after'
+match_indent = true
+payload = '''
+self.config.visual_limit = self.config.card_limit
+if G.jokers and self == G.jokers then
+    local count = 0
+    for i,v in ipairs(G.jokers.cards) do
+        if v.config.center.key == 'j_tac_herald' then
+            count = count + 1
+        end
+    end
+    self.config.card_count = #self.cards + count
+    self.config.visual_limit = self.config.card_limit + count
+end
+'''
+[[patches]]
+[patches.pattern]
+target = 'cardarea.lua'
+pattern = '''
+{n=G.UIT.T, config={ref_table = self.config, ref_value = 'card_limit', scale = 0.3, colour = G.C.WHITE}},
+'''
+position = 'at'
+match_indent = true
+payload = '''
+{n=G.UIT.T, config={ref_table = self.config, ref_value = 'visual_limit', scale = 0.3, colour = G.C.WHITE}},
+'''
+
+[[patches]]
+[patches.pattern]
+target = 'functions/common_events.lua'
+pattern = '''
+local _pool, _pool_key = get_current_pool(_type, _rarity, legendary, key_append)
+'''
+position = 'after'
+match_indent = true
+payload = '''
+if area == G.jokers then
+    for i,v in ipairs(_pool) do
+        if _pool[i] == 'j_tac_herald' then
+            _pool[i] = "UNAVAILABLE"
+        end
+    end
+end
+'''
+
+#challenge rentals
+[[patches]]
+[patches.pattern]
+target = 'game.lua'
+pattern = '''
+if v.pinned then _joker.pinned = true end
+'''
+position = 'after'
+match_indent = true
+payload = '''
+if v.rental then _joker:set_rental(true) end
+'''
+[[patches]]
+[patches.pattern]
+target = 'functions/UI_definitions.lua'
+pattern = '''
+if v.eternal then card:set_eternal(true) end
+'''
+position = 'after'
+match_indent = true
+payload = '''
+if v.rental then card:set_rental(true) end
+'''
+[[patches]]
+[patches.pattern]
+target = 'functions/UI_definitions.lua'
+pattern = '''
+if card.ability.consumeable and card.area == G.pack_cards and booster_obj and booster_obj.select_card and card:selectable_from_pack(booster_obj) then
+'''
+position = 'before'
+match_indent = true
+payload = '''
+if Tacky.config.crook_button == true and card.config.center.key == 'j_tac_crook' then
+use = {n=G.UIT.C, config={align = "cr"}, nodes={
+      {n=G.UIT.C, config={ref_table = card, align = "cr",padding = 0.1, r=0.08, minw = 1.25, hover = true, shadow = true, colour = G.C.UI.BACKGROUND_INACTIVE, one_press = true, button = 'tac_crook_use', func = 'tac_crook_can'}, nodes={
+        {n=G.UIT.B, config = {w=0.1,h=0.6}},
+        {n=G.UIT.C, config={align = "tm"}, nodes={
+          {n=G.UIT.R, config={align = "cm", maxw = 1.25}, nodes={ {n=G.UIT.T, config={text = 'DRAW',colour = G.C.UI.TEXT_LIGHT, scale = 0.4, shadow = true}}}},
+          {n=G.UIT.R, config={align = "cm", maxw = 1.25}, nodes={ {n=G.UIT.T, config={text = 'DECK',colour = G.C.UI.TEXT_LIGHT, scale = 0.4, shadow = true}}}}
+          }
+        }
+      }}
+    }}
+end
+'''
+#fixing immolate
+[[patches]]
+[patches.pattern]
+target = 'card.lua'
+pattern = '''
+local temp_hand = {}
+for k, v in ipairs(G.hand.cards) do temp_hand[#temp_hand+1] = v end
+            table.sort(temp_hand, function (a, b) return not a.playing_card or not b.playing_card or a.playing_card < b.playing_card end)
+            pseudoshuffle(temp_hand, pseudoseed('immolate'))
+
+            for i = 1, self.ability.extra.destroy do destroyed_cards[#destroyed_cards+1] = temp_hand[i] end
+'''
+position = 'at'
+match_indent = true
+payload = '''
+local destroy = self.ability.extra.destroy
+if self.ability.extra.destroy > #G.hand.cards then
+    destroy = #G.hand.cards
+end
+for i = 1, destroy do
+    local insert, _num = false
+    repeat
+    insert = true
+        _num = pseudorandom(pseudoseed('immolate'), 1, #G.hand.cards)
+        for i,v in ipairs(destroyed_cards) do
+            if v == G.hand.cards[_num] then
+                insert = false
+            end
+        end
+    until insert == true
+    destroyed_cards[i] = G.hand.cards[_num]
+end
+'''
+
+[[patches]]
+[patches.pattern]
+target = 'functions/state_events.lua'
+pattern = '''
+if cards_destroyed[1] then
+'''
+position = 'after'
+match_indent = true
+payload = '''
+for i,v in ipairs(cards_destroyed) do
+    if v == G.GAME.current_round.chaos_card then
+        reset_chaos_theory()
+    end
+end
+'''
+
+#algorithm
+[[patches]]
+[patches.pattern]
+target = 'card.lua'
+pattern = '''
+-- TARGET: calculate card_added
+        
+            if not is_playing_card then
+                SMODS.calculate_context({card_added = true, card = self})
+                SMODS.enh_cache:clear()
+'''
+position = 'after'
+match_indent = true
+payload = '''
+local tac_algo = SMODS.find_card('j_tac_algo')
+if tac_algo[1] then
+    if self.ability.set == 'Joker' then
+        G.GAME.tac_algo_card = self.config.center.key
+    end
+end
+'''
+
+[[patches]]
+[patches.pattern]
+target = 'card.lua'
+pattern = '''
+if self.ability.name == 'Egg' then
+                    self.ability.extra_value = self.ability.extra_value + self.ability.extra
+                    self:set_cost()
+'''
+position = 'after'
+match_indent = true
+payload = '''
+SMODS.calculate_context({egg_up = true, egg = self})
+'''
+
+[[patches]]
+[patches.pattern]
+target = 'card.lua'
+pattern = '''
+function Card:remove_from_deck(from_debuff)
+    if self.added_to_deck then
+        self.added_to_deck = false
+'''
+position = 'after'
+match_indent = true
+payload = '''
+if not G.CONTROLLER.locks.selling_card then
+            SMODS.calculate_context({ card_destroyed = true, destroyed_card = self })
+        end
+'''
